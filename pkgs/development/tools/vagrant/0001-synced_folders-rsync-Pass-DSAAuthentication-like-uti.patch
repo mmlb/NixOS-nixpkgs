@@ -1,0 +1,35 @@
+From 1649e3be0c8befdbebbdbd520508a11e0ba53508 Mon Sep 17 00:00:00 2001
+From: Manuel Mendez <github@i.m.mmlb.dev>
+Date: Thu, 5 May 2022 12:33:11 -0400
+Subject: [PATCH 1/2] synced_folders/rsync: Pass DSAAuthentication like
+ util/ssh does
+
+I kept having `rsync` prompt for vagrant users' password, but `ssh` never
+did. I tracked it down to my default ssh config having PubkeyAuthentication=no
+by default. The `ssh` builtin doesn't get stuck because it provides
+`DSAAuthentication=yes` by default which is treated as an alias to
+PubkeyAuthentication since openssh-2.5.1p1.
+
+Fixes #8183
+---
+ plugins/synced_folders/rsync/helper.rb | 4 ++++
+ 2 files changed, 5 insertions(+)
+
+diff --git a/plugins/synced_folders/rsync/helper.rb b/plugins/synced_folders/rsync/helper.rb
+index e3b0ef90b..9354466f5 100644
+--- a/plugins/synced_folders/rsync/helper.rb
++++ b/plugins/synced_folders/rsync/helper.rb
+@@ -109,6 +109,10 @@ module VagrantPlugins
+           control_options,
+         ]
+ 
++        if ssh_info[:dsa_authentication]
++          rsh += ["-o", "DSAAuthentication=yes"]
++        end
++
+         # Solaris/OpenSolaris/Illumos uses SunSSH which doesn't support the
+         # IdentitiesOnly option. Also, we don't enable it if keys_only is false
+         # so that SSH properly searches our identities and tries to do it itself.
+-- 
+2.36.1
+

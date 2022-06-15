@@ -1,0 +1,176 @@
+From 1031faf9a4e54e54d50079e80e0c8dd6bbb95167 Mon Sep 17 00:00:00 2001
+From: Manuel Mendez <github@i.m.mmlb.dev>
+Date: Thu, 5 May 2022 12:51:16 -0400
+Subject: [PATCH 2/2] ssh: Add support for PubkeyAuthentication
+
+And mark DSAAuthentication as deprecated. PubkeyAuthentication was introduced
+in OpenSSH 2.5.1p1 (2001-02-19) as a replacement for DSAAuthentication,
+current documentation does not mention DSAAuthentication which makes debugging
+issues harder than necessary.
+---
+ lib/vagrant/machine.rb                            |  2 ++
+ lib/vagrant/util/ssh.rb                           |  4 ++++
+ plugins/kernel_v2/config/ssh_connect.rb           |  3 +++
+ plugins/synced_folders/rsync/helper.rb            |  4 ++++
+ test/unit/vagrant/util/ssh_test.rb                | 11 +++++++----
+ website/content/docs/vagrantfile/ssh_settings.mdx |  7 +++++++
+ 7 files changed, 29 insertions(+), 4 deletions(-)
+
+diff --git a/lib/vagrant/machine.rb b/lib/vagrant/machine.rb
+index 921774fd1..a2431de50 100644
+--- a/lib/vagrant/machine.rb
++++ b/lib/vagrant/machine.rb
+@@ -464,6 +464,7 @@ module Vagrant
+       info[:username] ||= @config.ssh.default.username
+       info[:remote_user] ||= @config.ssh.default.remote_user
+       info[:compression] ||= @config.ssh.default.compression
++      info[:pubkey_authentication] ||= @config.ssh.default.pubkey_authentication
+       info[:dsa_authentication] ||= @config.ssh.default.dsa_authentication
+       info[:extra_args] ||= @config.ssh.default.extra_args
+       info[:config] ||= @config.ssh.default.config
+@@ -475,6 +476,7 @@ module Vagrant
+       info[:keys_only] = @config.ssh.keys_only
+       info[:verify_host_key] = @config.ssh.verify_host_key
+       info[:compression] = @config.ssh.compression
++      info[:pubkey_authentication] = @config.ssh.pubkey_authentication
+       info[:dsa_authentication] = @config.ssh.dsa_authentication
+       info[:username] = @config.ssh.username if @config.ssh.username
+       info[:password] = @config.ssh.password if @config.ssh.password
+diff --git a/lib/vagrant/util/ssh.rb b/lib/vagrant/util/ssh.rb
+index e2b0ffaba..a24cb2c2f 100644
+--- a/lib/vagrant/util/ssh.rb
++++ b/lib/vagrant/util/ssh.rb
+@@ -127,6 +127,10 @@ module Vagrant
+           command_options += ["-o", "Compression=yes"]
+         end
+ 
++        if ssh_info[:pubkey_authentication]
++          command_options += ["-o", "PubkeyAuthentication=yes"]
++        end
++
+         if ssh_info[:dsa_authentication]
+           command_options += ["-o", "DSAAuthentication=yes"]
+         end
+diff --git a/plugins/kernel_v2/config/ssh_connect.rb b/plugins/kernel_v2/config/ssh_connect.rb
+index 21116d26e..129375db9 100644
+--- a/plugins/kernel_v2/config/ssh_connect.rb
++++ b/plugins/kernel_v2/config/ssh_connect.rb
+@@ -15,6 +15,7 @@ module VagrantPlugins
+       attr_accessor :paranoid
+       attr_accessor :verify_host_key
+       attr_accessor :compression
++      attr_accessor :pubkey_authentication
+       attr_accessor :dsa_authentication
+       attr_accessor :extra_args
+       attr_accessor :remote_user
+@@ -32,6 +33,7 @@ module VagrantPlugins
+         @paranoid         = UNSET_VALUE
+         @verify_host_key  = UNSET_VALUE
+         @compression      = UNSET_VALUE
++        @pubkey_authentication = UNSET_VALUE
+         @dsa_authentication = UNSET_VALUE
+         @extra_args       = UNSET_VALUE
+         @remote_user      = UNSET_VALUE
+@@ -48,6 +50,7 @@ module VagrantPlugins
+         @paranoid         = false if @paranoid == UNSET_VALUE
+         @verify_host_key  = :never if @verify_host_key == UNSET_VALUE
+         @compression      = true if @compression == UNSET_VALUE
++        @pubkey_authentication = true if @pubkey_authentication == UNSET_VALUE
+         @dsa_authentication = true if @dsa_authentication == UNSET_VALUE
+         @extra_args       = nil if @extra_args == UNSET_VALUE
+         @config           = nil if @config == UNSET_VALUE
+diff --git a/plugins/synced_folders/rsync/helper.rb b/plugins/synced_folders/rsync/helper.rb
+index 9354466f5..d05d50a89 100644
+--- a/plugins/synced_folders/rsync/helper.rb
++++ b/plugins/synced_folders/rsync/helper.rb
+@@ -109,6 +109,10 @@ module VagrantPlugins
+           control_options,
+         ]
+ 
++        if ssh_info[:pubkey_authentication]
++          rsh += ["-o", "PubkeyAuthentication=yes"]
++        end
++
+         if ssh_info[:dsa_authentication]
+           rsh += ["-o", "DSAAuthentication=yes"]
+         end
+diff --git a/test/unit/vagrant/util/ssh_test.rb b/test/unit/vagrant/util/ssh_test.rb
+index f1998994e..df5c13efc 100644
+--- a/test/unit/vagrant/util/ssh_test.rb
++++ b/test/unit/vagrant/util/ssh_test.rb
+@@ -36,6 +36,7 @@ describe Vagrant::Util::SSH do
+       username: "vagrant",
+       private_key_path: [private_key_path],
+       compression: true,
++      pubkey_authentication: true,
+       dsa_authentication: true
+     }}
+ 
+@@ -87,7 +88,7 @@ describe Vagrant::Util::SSH do
+ 
+       expect(described_class.exec(ssh_info)).to eq(nil)
+       expect(Vagrant::Util::SafeExec).to have_received(:exec)
+-        .with(ssh_path, "vagrant@localhost", "-p", "2222", "-o", "LogLevel=FATAL","-o", "Compression=yes", "-o", "DSAAuthentication=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-i", ssh_info[:private_key_path][0])
++        .with(ssh_path, "vagrant@localhost", "-p", "2222", "-o", "LogLevel=FATAL","-o", "Compression=yes", "-o", "PubkeyAuthentication=yes", "-o", "DSAAuthentication=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-i", ssh_info[:private_key_path][0])
+     end
+ 
+     context "when using '%' in a private_key_path" do
+@@ -98,6 +99,7 @@ describe Vagrant::Util::SSH do
+         username: "vagrant",
+         private_key_path: [private_key_path],
+         compression: true,
++        pubkey_authentication: true,
+         dsa_authentication: true
+       }}
+ 
+@@ -106,21 +108,22 @@ describe Vagrant::Util::SSH do
+         described_class.exec(ssh_info)
+ 
+         expect(Vagrant::Util::SafeExec).to have_received(:exec)
+-          .with(ssh_path, "vagrant@localhost", "-p", "2222", "-o", "LogLevel=FATAL","-o", "Compression=yes", "-o", "DSAAuthentication=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentityFile=\"/tmp/percent%%folder\"")
++          .with(ssh_path, "vagrant@localhost", "-p", "2222", "-o", "LogLevel=FATAL","-o", "Compression=yes", "-o", "PubkeyAuthentication=yes", "-o", "DSAAuthentication=yes", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", "-o", "IdentityFile=\"/tmp/percent%%folder\"")
+       end
+     end
+ 
+-    context "when disabling compression or dsa_authentication flags" do
++    context "when disabling compression, pubkey_authentication or dsa_authentication flags" do
+       let(:ssh_info) {{
+         host: "localhost",
+         port: 2222,
+         username: "vagrant",
+         private_key_path: [private_key_path],
+         compression: false,
++        pubkey_authentication: false,
+         dsa_authentication: false
+       }}
+ 
+-      it "does not include compression or dsa_authentication flags if disabled" do
++      it "does not include compression, pubkey_authentication or dsa_authentication flags if disabled" do
+         allow(Vagrant::Util::SafeExec).to receive(:exec).and_return(nil)
+ 
+         expect(described_class.exec(ssh_info)).to eq(nil)
+diff --git a/website/content/docs/vagrantfile/ssh_settings.mdx b/website/content/docs/vagrantfile/ssh_settings.mdx
+index 8faf595fa..f008b6027 100644
+--- a/website/content/docs/vagrantfile/ssh_settings.mdx
++++ b/website/content/docs/vagrantfile/ssh_settings.mdx
+@@ -27,10 +27,17 @@ defaults are typically fine, but you can fine tune whatever you would like.
+ - `config.ssh.config` (string) - Path to a custom ssh_config file to use for configuring
+   the SSH connections.
+ 
++- `config.ssh.pubkey_authentication` (boolean) - If `false`, this setting will not include
++  `PubkeyAuthentication` when ssh'ing into a machine. If this is not set, it will
++  default to `true` and `PubkeyAuthentication=yes` will be used with ssh.
++
+ - `config.ssh.dsa_authentication` (boolean) - If `false`, this setting will not include
+   `DSAAuthentication` when ssh'ing into a machine. If this is not set, it will
+   default to `true` and `DSAAuthentication=yes` will be used with ssh.
+ 
++  !> **Deprecation:** The `config.ssh.dsa_authentication` option is deprecated and will be removed
++  in a future release. Please use the `config.ssh.pubkey_authentication` option instead.
++
+ - `config.ssh.export_command_template` (string) - The template used to generate
+   exported environment variables in the active session. This can be useful
+   when using a Bourne incompatible shell like C shell. The template supports
+-- 
+2.36.1
+

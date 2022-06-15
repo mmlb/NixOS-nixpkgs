@@ -55,6 +55,8 @@ in buildRubyGem rec {
     ./use-system-bundler-version.patch
     ./0004-Support-system-installed-plugins.patch
     ./0001-Revert-Merge-pull-request-12225-from-chrisroberts-re.patch
+    ./0001-synced_folders-rsync-Pass-DSAAuthentication-like-uti.patch
+    ./0002-ssh-Add-support-for-PubkeyAuthentication.patch
   ];
 
   postPatch = ''
