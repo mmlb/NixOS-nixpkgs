@@ -34889,6 +34889,23 @@ with pkgs;
     toolsOnly = true;
   };
 
+  qemuMinimal = qemu.override {
+    alsaSupport = false;
+    capstoneSupport = false;
+    enableDocs = false;
+    gtkSupport = false;
+    guestAgentSupport = false;
+    jackSupport = false;
+    libiscsiSupport = false;
+    numaSupport = false;
+    pulseSupport = false;
+    sdlSupport = false;
+    seccompSupport = false;
+    smartcardSupport = false;
+    spiceSupport = false;
+    tpmSupport = false;
+  };
+
   canokey-qemu = callPackage ../applications/virtualization/qemu/canokey-qemu.nix { };
 
   wrapQemuBinfmtP = callPackage ../applications/virtualization/qemu/binfmt-p-wrapper.nix { };
